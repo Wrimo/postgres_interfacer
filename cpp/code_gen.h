@@ -1,3 +1,4 @@
 #include <pqxx/pqxx>
-
-void generateTypes(pqxx::work &txn); 
+#include <string>
+void generateTypes(pqxx::work &); 
+void dataCleanup(std::string &);

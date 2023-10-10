@@ -1,11 +1,11 @@
 -- Gets all of the tables and their fields
 -- Used to generate types in C++
-CREATE FUNCTION get_tables_and_fields()
+CREATE OR REPLACE FUNCTION get_tables_and_fields()
 RETURNS TABLE(name text, fields text[])
 as $$
 select
     t.table_name::text,
-    array_agg(c.column_name::text) as columns
+    array_agg(c.column_name::text || ' ' || c.data_type) as columns
 from
     information_schema.tables t
 inner join information_schema.columns c on
