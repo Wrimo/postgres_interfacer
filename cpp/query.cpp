@@ -1,19 +1,19 @@
-#include <iostream> 
-#include <sstream>
+#include <iostream>
+#include "procedures.h"
 #include "hidden.h"
-#include "code_gen.h"
 
 int main() 
-{   
+{
     std::stringstream conString; 
     conString << "postgresql://" << USERNAME << ":" << PASSWORD << "@localhost:" <<  PORT << "/" << USERNAME;
     pqxx::connection c{conString.str()};
     pqxx::work txn{c};
 
-    generateTypes(txn);
-    generateFunctions(txn);
-        
-    txn.commit();
+    pqxx::result r = get_authors(txn);
+    for(auto row : r)
+    {
+        std::cout << row["firstName"] << "\n";
+    }
 
-    return 0; 
+    return 0;
 }

@@ -1,10 +1,10 @@
-CREATE TABLE books 
+CREATE TABLE book
 (
     id integer, 
     title text, 
     author_id integer 
 );
-CREATE TABLE sales 
+CREATE TABLE sale 
 (
     id integer, 
     sales numeric,
@@ -18,3 +18,10 @@ CREATE TABLE author
     age int
 );
 
+INSERT INTO book VALUES 
+(0, 'Blood Meridian', 0), 
+(1, 'Mrs. Dalloway', 1);
+
+INSERT INTO author VALUES 
+(0, 'Cormac', 'McCarthy', 90),
+(1, 'Virgina', 'Woolf', 141); 

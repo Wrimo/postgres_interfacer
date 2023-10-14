@@ -32,6 +32,7 @@ std::string getDataType(std::string &postgresType)
 
 void generateTypes(pqxx::work &txn)
 {
+    std::cout << "GENERATING TYPES\n";
     pqxx::result r {txn.exec("SELECT name, fields FROM get_tables_and_fields();")};
     std::ofstream headerFile("cpp/types.h"); 
     headerFile << "#include <string>\n";
@@ -56,4 +57,25 @@ void generateTypes(pqxx::work &txn)
         headerFile << "} " << row["name"] << ";\n"; 
     }
     headerFile.close();
+    std::cout << "FINISHED GENERATING TYPES\n";
+}
+
+void generateFunctions(pqxx::work &txn)
+{
+    std::cout << "GENERATING FUNCTIONS\n";
+    pqxx::result r {txn.exec("SELECT name, argnum, args FROM get_stored_procedures();")};
+    std::ofstream headerFile("cpp/procedures.h");
+    std::ofstream cppFile("cpp/procedures.cpp");
+    
+    headerFile << "#include <pqxx/pqxx>\n" << "#include <string>\n\n"; 
+    cppFile << "#include \"procedures.h\"\n";
+ 
+    for(auto row : r)
+    {
+        headerFile << "\npqxx::result " << row["name"].c_str() << "(pqxx::work &);"; // need to modify to have support for optional parameters, requires changes to SQL 
+        cppFile << "\npqxx::result " << row["name"].c_str() << "(pqxx::work &txn)\n";
+        cppFile << "{\n	pqxx::result r {txn.exec(\"SELECT * FROM " << row["name"].c_str() << "();\")};";
+        cppFile << "\n	return r;\n}";
+    }
+    std::cout << "FINISHED GENERATING FUNCTIONS\n";
 }
