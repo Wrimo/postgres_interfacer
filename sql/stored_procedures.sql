@@ -21,17 +21,19 @@ $$ LANGUAGE SQL;
 
 
 CREATE OR REPLACE FUNCTION get_stored_procedures()
-RETURNS TABLE (name text, argnum integer, args text[])
+RETURNS TABLE (name text, argtype text[], argname text[])
 AS $$ 
-SELECT
-    p.proname::text,
-    p.pronargs::integer, 
-    p.proargnames
-FROM
-    pg_proc p
-    LEFT JOIN pg_namespace n ON p.pronamespace = n.oid
-WHERE
-    n.nspname IN ('public')
+select 
+    p.proname::text as name, 
+    p.proargnames, 
+    array_agg(pt.typname::text) as types 
+from 
+    pg_proc p 
+    left join pg_namespace n on p.pronamespace = n.oid 
+    left join pg_type pt on pt.oid = ANY(p.proallargtypes)
+where 
+    n.nspname in ('public')
+group by name, p.proargnames; 
 $$ LANGUAGE SQL; 
 
 SET SCHEMA 'public';
@@ -41,4 +43,22 @@ AS $$
 select * 
 from 
     author
+$$ LANGUAGE SQL;
+
+CREATE OR REPLACE FUNCTION get_authors_over_age(age integer) 
+RETURNS TABLE (id integer, firstName text, lastName text, age int)
+AS $$
+select * 
+from 
+    author
+where age > $1
+$$ LANGUAGE SQL;
+
+CREATE OR REPLACE FUNCTION get_author_name_like(name text) 
+RETURNS TABLE (id integer, firstName text, lastName text, age int)
+AS $$
+select * 
+from 
+    author
+where name like $1 || '%'
 $$ LANGUAGE SQL;
