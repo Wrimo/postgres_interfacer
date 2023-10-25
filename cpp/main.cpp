@@ -10,7 +10,7 @@ int main()
     pqxx::connection c{conString.str()};
     pqxx::work txn{c};
 
-    generateTypes(txn);
+    generateStructs(txn);
     generateFunctions(txn);
         
     txn.commit();

@@ -1,8 +1,10 @@
 #include <pqxx/pqxx>
 #include <string>
 
-void generateTypes(pqxx::work &);
-std::string getDataType(std::string &);
+std::string convertDataType(std::string &);
+std::string getTypes(std::string &);
 void dataCleanup(std::string &);
 
+
 void generateFunctions(pqxx::work &); 
+void generateStructs(pqxx::work &);
