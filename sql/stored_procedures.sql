@@ -21,19 +21,18 @@ $$ LANGUAGE SQL;
 
 
 CREATE OR REPLACE FUNCTION get_stored_procedures()
-RETURNS TABLE (name text, argtype text[], argname text[])
+RETURNS TABLE (name text, output text, input text)
 AS $$ 
 select 
     p.proname::text as name, 
-    p.proargnames, 
-    array_agg(pt.typname::text) as types 
+    pg_catalog.pg_get_function_result(p.oid)::text, 
+    pg_catalog.pg_get_function_arguments(p.oid)::text
 from 
     pg_proc p 
     left join pg_namespace n on p.pronamespace = n.oid 
-    left join pg_type pt on pt.oid = ANY(p.proallargtypes)
 where 
     n.nspname in ('public')
-group by name, p.proargnames; 
+group by name, p.oid; 
 $$ LANGUAGE SQL; 
 
 SET SCHEMA 'public';
