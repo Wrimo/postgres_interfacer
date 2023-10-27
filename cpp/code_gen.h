@@ -2,7 +2,7 @@
 #include <string>
 
 std::string convertDataType(std::string &);
-std::string getTypes(std::string &);
+std::string getVariablesAndTypes(std::string &);
 void dataCleanup(std::string &);
 
 

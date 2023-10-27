@@ -9,7 +9,7 @@ int main()
     pqxx::connection c{conString.str()};
     pqxx::work txn{c};
 
-    pqxx::result r = get_authors(txn);
+    pqxx::result r = get_authors_over_age(txn, 70);
     for(auto row : r)
     {
         std::cout << row["firstName"] << "\n";
