@@ -1,20 +1,20 @@
 #include <string>
 
-struct {
+struct author{
 std::string lastname;
 std::string firstname;
 int id;
 int age;
-} author;
+};
 
-struct {
+struct book{
 int id;
 std::string title;
 int author_id;
-} book;
+};
 
-struct {
+struct sale{
 int book_id;
 double sales;
 int id;
-} sale;
+};

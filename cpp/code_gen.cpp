@@ -1,10 +1,10 @@
-#include "code_gen.h"
+
 #include <iostream>
-#include <string>
+#include "code_gen.h"
 #include <sstream>
 #include <fstream>
-#include <algorithm>
 
+#include <algorithm>
 // https://stackoverflow.com/questions/5891610/how-to-remove-certain-characters-from-a-string-in-c
 void dataCleanup(std::string &str)
 {
@@ -31,32 +31,25 @@ std::string convertDataType(std::string &postgresType)
     return "void *";
 }
 
-std::string getVariablesAndTypes(std::string &str, std::string delimeter, std::string endDelimer)
+std::vector<VariableData> getVariablesAndTypes(std::string &str)
 {
     dataCleanup(str);
     if (str.length() == 0)
-        return "";
-    std::ostringstream out;
-    std::ostringstream varNames; 
+        return {};
     std::istringstream ss(str);
     std::string name;
     std::string type;
+    std::vector<VariableData> variables;
     while (!ss.eof())
     {
         ss >> name;
         ss >> type;
-        type = convertDataType(type);
-        if(ss.eof())
-        {
-            out << type << " " << name << endDelimer;
-            varNames << name;
-            break;
-        }
-        varNames << name << " ";
-        out << type << " " << name << delimeter;
+        VariableData s;
+        s.name = name;
+        s.type = convertDataType(type);
+        variables.push_back(s);
     }
-    str = varNames.str();
-    return out.str();
+    return variables;
 }
 
 void generateStructs(pqxx::work &txn)
@@ -67,22 +60,27 @@ void generateStructs(pqxx::work &txn)
     headerFile << "#include <string>\n";
     for (auto row : r)
     {
-        headerFile << "\nstruct {\n";
+        headerFile << "\nstruct " << row["name"] << "{\n";
 
         std::string data = row["fields"].c_str();
-        headerFile << getVariablesAndTypes(data, ";\n", ";\n");
+        std::vector<VariableData> vars = getVariablesAndTypes(data);
 
-        headerFile << "} " << row["name"] << ";\n";
+        for (size_t i = 0; i < vars.size(); ++i)
+        {
+            headerFile << vars[i].type << " " << vars[i].name << ";\n";
+        }
+
+        headerFile << "};\n";
     }
     headerFile.close();
     std::cout << "FINISHED GENERATING TYPES\n";
 }
 
-
 // I think I need to make a parameter struct to easily keep track of datatype and name
 // to make conversion into string for the query easier
 void generateFunctions(pqxx::work &txn)
 {
+    // author test;
     std::cout << "GENERATING FUNCTIONS\n";
     pqxx::result r{txn.exec("SELECT * FROM private.get_stored_procedures();")};
     std::ofstream headerFile("cpp/procedures.h");
@@ -98,36 +96,38 @@ void generateFunctions(pqxx::work &txn)
         cppFile << "\npqxx::result " << row["name"].c_str() << "(pqxx::work &txn";
 
         std::string vars = row["input"].c_str();
-        std::string params = getVariablesAndTypes(vars, ", ", "");
+        std::vector<VariableData> params = getVariablesAndTypes(vars);
 
-        if(params != "")
+        for (size_t i = 0; i < params.size(); ++i)
         {
-            headerFile << ", " << params;
-            cppFile << ", " << params;
+            headerFile << ", " << params[i].type;
+            cppFile << ", " << params[i].type << " " << params[i].name;
         }
-
         headerFile << ");";
         cppFile << ")\n";
-        
-        std::ostringstream query; 
-        std::istringstream varNames (vars);
-        query << "SELECT * FROM " << row["name"].c_str() << "("; 
-        while(true)
+
+        std::ostringstream query;
+
+        query << "SELECT * FROM " << row["name"].c_str();
+        if (params.size() > 0)
         {
-            std::string next; 
-            varNames >> next;
-            if(varNames.eof())
+            query <<"(\"";
+            for (size_t i = 0; i < params.size(); ++i)
             {
-                if(next != "")
-                    query << "\" + std::to_string(" << next << ") + \"";
-                break;
+                query << " + ";
+                if (params[i].type == "std::string")
+                    query << params[i].name;
+                else if (params[i].type == "int" || params[i].type == "float")
+                    query << "std::to_string(" << params[i].name << ")";
+
+                query << (i == params.size() - 1 ? "" : " + \",\" ");
             }
-
-            query << "\" + std::to_string(" << next << ") + \", ";
+            query << " + \");";
         }
-        query << ")";
-
-
+        else 
+        {
+            query << "()";
+        }
 
         cppFile << "{\n	pqxx::result r {txn.exec(\"" << query.str() << "\")};";
         cppFile << "\n	return r;\n}";
