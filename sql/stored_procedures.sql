@@ -19,7 +19,6 @@ where
 group by t.table_name;
 $$ LANGUAGE SQL;
 
-
 CREATE OR REPLACE FUNCTION get_stored_procedures()
 RETURNS TABLE (name text, output text, input text)
 AS $$ 

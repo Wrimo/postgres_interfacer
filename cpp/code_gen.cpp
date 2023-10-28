@@ -76,11 +76,8 @@ void generateStructs(pqxx::work &txn)
     std::cout << "FINISHED GENERATING TYPES\n";
 }
 
-// I think I need to make a parameter struct to easily keep track of datatype and name
-// to make conversion into string for the query easier
 void generateFunctions(pqxx::work &txn)
 {
-    // author test;
     std::cout << "GENERATING FUNCTIONS\n";
     pqxx::result r{txn.exec("SELECT * FROM private.get_stored_procedures();")};
     std::ofstream headerFile("cpp/procedures.h");
@@ -92,7 +89,7 @@ void generateFunctions(pqxx::work &txn)
 
     for (auto row : r)
     {
-        headerFile << "\npqxx::result " << row["name"].c_str() << "(pqxx::work &txn"; // need to modify to have support for optional parameters, requires changes to SQL
+        headerFile << "\npqxx::result " << row["name"].c_str() << "(pqxx::work &txn";
         cppFile << "\npqxx::result " << row["name"].c_str() << "(pqxx::work &txn";
 
         std::string vars = row["input"].c_str();
@@ -111,7 +108,7 @@ void generateFunctions(pqxx::work &txn)
         query << "SELECT * FROM " << row["name"].c_str();
         if (params.size() > 0)
         {
-            query <<"(\"";
+            query << "(\"";
             for (size_t i = 0; i < params.size(); ++i)
             {
                 query << " + ";
@@ -124,7 +121,7 @@ void generateFunctions(pqxx::work &txn)
             }
             query << " + \");";
         }
-        else 
+        else
         {
             query << "()";
         }
