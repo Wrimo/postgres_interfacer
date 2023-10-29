@@ -108,18 +108,52 @@ void generateFunctions(pqxx::work &txn)
         query << "SELECT * FROM " << row["name"].c_str();
         if (params.size() > 0)
         {
-            query << "(\"";
+            bool inString = true;
+            query << "(";
+
             for (size_t i = 0; i < params.size(); ++i)
             {
-                query << " + ";
                 if (params[i].type == "std::string")
-                    query << params[i].name;
+                    if (inString)
+                    {
+                        query << R"(\'" + )" << params[i].name << R"( + "\')";
+                        inString = true;
+                    }
+                    else
+                    {
+                        query << R"(+ "\'" + )" << params[i].name << R"( + "\')";
+                        inString = true;
+                    }
                 else if (params[i].type == "int" || params[i].type == "float")
-                    query << "std::to_string(" << params[i].name << ")";
+                {
+                    if (inString)
+                    {
+                        query << "\" + std::to_string(" << params[i].name << ")";
+                        inString = false;
+                    }
+                    else
+                    {
+                        query << " + std::to_string(" << params[i].name << ")";
+                    }
+                }
 
-                query << (i == params.size() - 1 ? "" : " + \",\" ");
+                if (i == params.size() - 1)
+                {
+                }
+                else
+                {
+                    if (inString)
+                    {
+                        query << R"(, )";
+                    }
+                    else 
+                    {
+                        query << R"(+ ",")";
+                    }
+                }
             }
-            query << " + \");";
+
+            query <<  (inString ?  ");" : " + \");");
         }
         else
         {

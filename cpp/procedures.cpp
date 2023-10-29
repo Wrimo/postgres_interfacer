@@ -12,11 +12,11 @@ pqxx::result get_authors(pqxx::work &txn)
 }
 pqxx::result get_author_name_like(pqxx::work &txn, std::string name)
 {
-	pqxx::result r {txn.exec("SELECT * FROM get_author_name_like(" + name + ");")};
+	pqxx::result r {txn.exec("SELECT * FROM get_author_name_like(\'" + name + "\');")};
 	return r;
 }
 pqxx::result get_author_name_like(pqxx::work &txn, std::string name, int age)
 {
-	pqxx::result r {txn.exec("SELECT * FROM get_author_name_like(" + name + ","  + std::to_string(age) + ");")};
+	pqxx::result r {txn.exec("SELECT * FROM get_author_name_like(\'" + name + "\', " + std::to_string(age) + ");")};
 	return r;
 }

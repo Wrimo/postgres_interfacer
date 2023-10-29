@@ -58,5 +58,5 @@ AS $$
 select * 
 from 
     author
-where name like $1 || '%'
+where firstName like $1 || '%'
 $$ LANGUAGE SQL;
