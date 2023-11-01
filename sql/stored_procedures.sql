@@ -36,15 +36,15 @@ $$ LANGUAGE SQL;
 
 SET SCHEMA 'public';
 CREATE OR REPLACE FUNCTION get_authors()
-RETURNS TABLE (id integer, firstName text, lastName text, age int) 
+RETURNS SETOF author
 AS $$
 select * 
 from 
     author
-$$ LANGUAGE SQL;
+$$ LANGUAGE SQL;RETURNS TABLE (id integer, firstName text, lastName text, age int)
 
 CREATE OR REPLACE FUNCTION get_authors_over_age(age integer) 
-RETURNS TABLE (id integer, firstName text, lastName text, age int)
+RETURNS SETOF author
 AS $$
 select * 
 from 
@@ -53,7 +53,7 @@ where age > $1
 $$ LANGUAGE SQL;
 
 CREATE OR REPLACE FUNCTION get_author_name_like(name text) 
-RETURNS TABLE (id integer, firstName text, lastName text, age int)
+RETURNS SETOF author
 AS $$
 select * 
 from 

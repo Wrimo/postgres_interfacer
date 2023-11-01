@@ -1,23 +1,49 @@
 #include "procedures.h"
 std::string quote(std::string & str) { return "\'" + str + "\'";}
 
-pqxx::result get_authors_over_age(pqxx::work &txn, int age)
+
+std::vector<author> get_authors_over_age(pqxx::work &txn, int age)
 {
 	pqxx::result r {txn.exec("SELECT * FROM get_authors_over_age(" + std::to_string(age) + ");")};
-	return r;
+    std::vector<author> data;
+    for (auto row : r)
+    {
+        author x;
+        x.lastname = row["lastname"].c_str();
+        x.firstname = row["firstname"].c_str();
+        x.id = std::stoi(row["id"].c_str());
+        x.age = std::stoi(row["age"].c_str());
+        data.push_back(x);
+    }
+	return data;
 }
-pqxx::result get_authors(pqxx::work &txn)
-{
-	pqxx::result r {txn.exec("SELECT * FROM get_authors()")};
-	return r;
-}
-pqxx::result get_author_name_like(pqxx::work &txn, std::string name)
+std::vector<author> get_author_name_like(pqxx::work &txn, std::string name)
 {
 	pqxx::result r {txn.exec("SELECT * FROM get_author_name_like(" + quote(name) + ");")};
-	return r;
+    std::vector<author> data;
+    for (auto row : r)
+    {
+        author x;
+        x.lastname = row["lastname"].c_str();
+        x.firstname = row["firstname"].c_str();
+        x.id = std::stoi(row["id"].c_str());
+        x.age = std::stoi(row["age"].c_str());
+        data.push_back(x);
+    }
+	return data;
 }
-pqxx::result get_author_name_like(pqxx::work &txn, std::string name, int age)
+std::vector<author> get_authors(pqxx::work &txn)
 {
-	pqxx::result r {txn.exec("SELECT * FROM get_author_name_like(" + quote(name)+ ", " + std::to_string(age) + ");")};
-	return r;
+	pqxx::result r {txn.exec("SELECT * FROM get_authors()")};
+    std::vector<author> data;
+    for (auto row : r)
+    {
+        author x;
+        x.lastname = row["lastname"].c_str();
+        x.firstname = row["firstname"].c_str();
+        x.id = std::stoi(row["id"].c_str());
+        x.age = std::stoi(row["age"].c_str());
+        data.push_back(x);
+    }
+	return data;
 }

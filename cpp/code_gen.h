@@ -4,12 +4,18 @@
 #include <pqxx/pqxx>
 #include <string>
 #include <vector>
+#include <map>
 
-class VariableData
+struct VariableData
 {
-public:
     std::string name;
     std::string type;
+};
+
+struct TableData
+{
+    std::string name; 
+    std::vector<VariableData> rows; 
 };
 
 std::string convertDataType(std::string &);

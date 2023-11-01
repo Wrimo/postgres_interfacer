@@ -5,6 +5,8 @@
 #include <fstream>
 
 #include <algorithm>
+
+std::map<std::string, TableData> Tables;
 // https://stackoverflow.com/questions/5891610/how-to-remove-certain-characters-from-a-string-in-c
 void dataCleanup(std::string &str)
 {
@@ -61,10 +63,13 @@ void generateStructs(pqxx::work &txn)
     for (auto row : r)
     {
         headerFile << "\nstruct " << row["name"] << "{\n";
+        TableData table;
+        table.name = row["name"].c_str();
 
         std::string data = row["fields"].c_str();
         std::vector<VariableData> vars = getVariablesAndTypes(data);
-
+        table.rows = vars;
+        Tables[table.name] = table;
         for (size_t i = 0; i < vars.size(); ++i)
         {
             headerFile << vars[i].type << " " << vars[i].name << ";\n";
@@ -84,17 +89,23 @@ void generateFunctions(pqxx::work &txn)
     std::ofstream cppFile("cpp/procedures.cpp");
 
     headerFile << "#include <pqxx/pqxx>\n"
-               << "#include <string>\n\n";
+               << "#include <string>\n"
+               << "#include <vector>\n"
+               << "#include \"types.h\"\n\n";
     cppFile << "#include \"procedures.h\"\n";
 
     headerFile << "std::string quote(std::string &);\n\n";
     cppFile << R"(std::string quote(std::string & str) { return "\'" + str + "\'";})"
-            << "\n";
+            << "\n\n";
 
     for (auto row : r)
     {
-        headerFile << "\npqxx::result " << row["name"].c_str() << "(pqxx::work &txn";
-        cppFile << "\npqxx::result " << row["name"].c_str() << "(pqxx::work &txn";
+        std::istringstream returnType(row["output"].c_str());
+        std::string table;
+        returnType >> table;
+        returnType >> table;
+        headerFile << "\nstd::vector<" << table << "> " << row["name"].c_str() << "(pqxx::work &txn";
+        cppFile << "\nstd::vector<" << table << "> " << row["name"].c_str() << "(pqxx::work &txn";
 
         std::string vars = row["input"].c_str();
         std::vector<VariableData> params = getVariablesAndTypes(vars);
@@ -125,7 +136,7 @@ void generateFunctions(pqxx::work &txn)
                     query << " + std::to_string(" << params[i].name << ")";
                 }
 
-                query << (i == params.size() -1 ? "" : R"(+ ", ")");
+                query << (i == params.size() - 1 ? "" : R"(+ ", ")");
             }
 
             query << " + \");";
@@ -135,8 +146,31 @@ void generateFunctions(pqxx::work &txn)
             query << "()";
         }
 
-        cppFile << "{\n	pqxx::result r {txn.exec(\"" << query.str() << "\")};";
-        cppFile << "\n	return r;\n}";
+        cppFile << "{\n	pqxx::result r {txn.exec(\"" << query.str() << "\")};\n";
+
+        cppFile << "    std::vector<" << table << "> data;\n";
+        cppFile << "    for (auto row : r)\n    {\n"
+                << "        " << table << " x;\n";
+
+        // convert each value in row to value in struct
+        // where to get output values?
+
+        for (VariableData row : Tables[table].rows)
+        {
+            if (row.type == "int")
+                cppFile << "        x." << row.name << " = "
+                        << "std::stoi(row[\"" << row.name << "\"].c_str());\n";
+            else if (row.type == "float")
+                cppFile << "        x." << row.name << " = "
+                        << "std::stof(row[\"" << row.name << "\"].c_str());\n";
+            else
+                cppFile << "        x." << row.name << " = "
+                        << "row[\"" << row.name << "\"].c_str();\n";
+        }
+        cppFile << "        data.push_back(x);\n";
+        cppFile << "    }";
+
+        cppFile << "\n	return data;\n}";
     }
     std::cout << "FINISHED GENERATING FUNCTIONS\n";
 }
