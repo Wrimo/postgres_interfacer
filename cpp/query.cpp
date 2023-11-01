@@ -12,7 +12,7 @@ int main()
     pqxx::connection c{conString.str()};
     pqxx::work txn{c};
 
-    pqxx::result r = get_authors_over_age(txn, 85);
+    pqxx::result r = get_author_name_like(txn, "Cormac");
     std::vector<author> vec; 
     for (auto row : r)
     {

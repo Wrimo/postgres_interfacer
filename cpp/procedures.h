@@ -1,6 +1,8 @@
 #include <pqxx/pqxx>
 #include <string>
 
+std::string quote(std::string &);
+
 
 pqxx::result get_authors_over_age(pqxx::work &txn, int);
 pqxx::result get_authors(pqxx::work &txn);

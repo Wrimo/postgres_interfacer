@@ -87,6 +87,10 @@ void generateFunctions(pqxx::work &txn)
                << "#include <string>\n\n";
     cppFile << "#include \"procedures.h\"\n";
 
+    headerFile << "std::string quote(std::string &);\n\n";
+    cppFile << R"(std::string quote(std::string & str) { return "\'" + str + "\'";})"
+            << "\n";
+
     for (auto row : r)
     {
         headerFile << "\npqxx::result " << row["name"].c_str() << "(pqxx::work &txn";
@@ -108,52 +112,23 @@ void generateFunctions(pqxx::work &txn)
         query << "SELECT * FROM " << row["name"].c_str();
         if (params.size() > 0)
         {
-            bool inString = true;
-            query << "(";
+            query << "(\"";
 
             for (size_t i = 0; i < params.size(); ++i)
             {
                 if (params[i].type == "std::string")
-                    if (inString)
-                    {
-                        query << R"(\'" + )" << params[i].name << R"( + "\')";
-                        inString = true;
-                    }
-                    else
-                    {
-                        query << R"(+ "\'" + )" << params[i].name << R"( + "\')";
-                        inString = true;
-                    }
+                {
+                    query << " + quote(" << params[i].name << ")";
+                }
                 else if (params[i].type == "int" || params[i].type == "float")
                 {
-                    if (inString)
-                    {
-                        query << "\" + std::to_string(" << params[i].name << ")";
-                        inString = false;
-                    }
-                    else
-                    {
-                        query << " + std::to_string(" << params[i].name << ")";
-                    }
+                    query << " + std::to_string(" << params[i].name << ")";
                 }
 
-                if (i == params.size() - 1)
-                {
-                }
-                else
-                {
-                    if (inString)
-                    {
-                        query << R"(, )";
-                    }
-                    else 
-                    {
-                        query << R"(+ ",")";
-                    }
-                }
+                query << (i == params.size() -1 ? "" : R"(+ ", ")");
             }
 
-            query <<  (inString ?  ");" : " + \");");
+            query << " + \");";
         }
         else
         {
