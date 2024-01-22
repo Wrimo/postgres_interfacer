@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    generateStructs(txn);
+    generateTableStructs(txn);
     generateFunctions(txn);
 
     txn.commit();

@@ -4,7 +4,7 @@ AS $$
 select * 
 from 
     author
-$$ LANGUAGE SQL;RETURNS TABLE (id integer, firstName text, lastName text, age int)
+$$ LANGUAGE SQL;
 
 CREATE OR REPLACE FUNCTION get_authors_over_age(age integer) 
 RETURNS SETOF author
@@ -22,4 +22,17 @@ select *
 from 
     author
 where firstName like $1 || '%'
+$$ LANGUAGE SQL;
+
+CREATE OR REPLACE FUNCTION get_author_books()
+RETURNS TABLE(name text, title text)
+AS $$
+select
+    firstName || ' ' || lastName as name, 
+    title
+from
+    author
+inner join book on
+    book.author_id = author.id
+group by name, title;
 $$ LANGUAGE SQL;

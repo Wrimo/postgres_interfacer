@@ -10,11 +10,14 @@ std::map<std::string, TableData> Tables;
 
 void dataCleanup(std::string &str)
 {
-    std::string badChars = "\"{}";
+    if (str.substr(0, 5) == "TABLE") 
+        str.erase(0, 5); 
+
     for (unsigned int i = 0; i < str.length(); ++i)
         if (str[i] == ',')
             str[i] = ' ';
 
+    std::string badChars = "\"{}()";
     for (unsigned int i = 0; i < badChars.length(); ++i)
         str.erase(remove(str.begin(), str.end(), badChars[i]), str.end());
 }
@@ -38,10 +41,12 @@ std::vector<VariableData> getVariablesAndTypes(std::string &str)
     dataCleanup(str);
     if (str.length() == 0)
         return {};
+
     std::istringstream ss(str);
     std::string name;
     std::string type;
     std::vector<VariableData> variables;
+
     while (!ss.eof())
     {
         ss >> name;
@@ -54,31 +59,49 @@ std::vector<VariableData> getVariablesAndTypes(std::string &str)
     return variables;
 }
 
-void generateStructs(pqxx::work &txn)
+std::string generateStructs(std::string &name, std::string &colums)
 {
-    std::cout << "GENERATING STRUCTS\n";
+    std::ostringstream strStruct;
+
+    strStruct << "\nstruct " << name << "Data{\n";
+
+    TableData table;
+    table.name = name + "Data";
+
+    std::vector<VariableData> vars = getVariablesAndTypes(colums);
+    table.rows = vars;
+    Tables[table.name] = table;
+
+    for (size_t i = 0; i < vars.size(); ++i)
+    {
+        strStruct << vars[i].type << " " << vars[i].name << ";\n";
+    }
+    strStruct << "};\n";
+
+    return "\n" + strStruct.str();
+}
+
+void generateFunctionStructs(pqxx::work &txn, std::string name, std::string columns)
+{
+    std::ofstream headerFile("types.h", std::ios_base::app);
+    headerFile << generateStructs(name, columns);
+    headerFile.close();
+}
+
+void generateTableStructs(pqxx::work &txn)
+{
+    std::cout << "GENERATING TABLE STRUCTS\n";
     pqxx::result r{txn.exec("SELECT * FROM private.get_tables_and_fields();")};
     std::ofstream headerFile("types.h");
     headerFile << "#include <string>\n";
     for (auto row : r)
     {
-        headerFile << "\nstruct " << row["name"] << "{\n";
-        TableData table;
-        table.name = row["name"].c_str();
-
-        std::string data = row["fields"].c_str();
-        std::vector<VariableData> vars = getVariablesAndTypes(data);
-        table.rows = vars;
-        Tables[table.name] = table;
-        for (size_t i = 0; i < vars.size(); ++i)
-        {
-            headerFile << vars[i].type << " " << vars[i].name << ";\n";
-        }
-
-        headerFile << "};\n";
+        std::string name = row["name"].c_str();
+        std::string columns = row["fields"].c_str();
+        headerFile << generateStructs(name, columns);
     }
     headerFile.close();
-    std::cout << "FINISHED GENERATING TYPES\n";
+    std::cout << "FINISHED TABLE STRUCTS\n";
 }
 
 void generateFunctions(pqxx::work &txn)
@@ -102,8 +125,17 @@ void generateFunctions(pqxx::work &txn)
     {
         std::istringstream returnType(row["output"].c_str());
         std::string table;
+
         returnType >> table;
-        returnType >> table;
+        if (table == "SETOF") // is returning rows from an existing table
+            returnType >> table;
+        else if (table.substr(0, 5) == "TABLE") // is returning a virtual table that needs to be created
+        {
+            table = row["name"].c_str();
+            generateFunctionStructs(txn, table, row["output"].c_str());
+        }
+        table = table + "Data";
+
         headerFile << "\nstd::vector<" << table << "> " << row["name"].c_str() << "(pqxx::work &txn";
         cppFile << "\nstd::vector<" << table << "> " << row["name"].c_str() << "(pqxx::work &txn";
 
@@ -128,13 +160,9 @@ void generateFunctions(pqxx::work &txn)
             for (size_t i = 0; i < params.size(); ++i)
             {
                 if (params[i].type == "std::string")
-                {
                     query << " + quote(" << params[i].name << ")";
-                }
                 else if (params[i].type == "int" || params[i].type == "float")
-                {
                     query << " + std::to_string(" << params[i].name << ")";
-                }
 
                 query << (i == params.size() - 1 ? "" : R"(+ ", ")");
             }
@@ -153,8 +181,6 @@ void generateFunctions(pqxx::work &txn)
                 << "        " << table << " x;\n";
 
         // convert each value in row to value in struct
-        // where to get output values?
-
         for (VariableData row : Tables[table].rows)
         {
             if (row.type == "int")

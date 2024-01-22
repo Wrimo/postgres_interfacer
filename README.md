@@ -27,4 +27,3 @@ Running `make clean` will remove the executable and delete the generated files.
 
 # Limitations
 - Only `text`, `integer`, `numeric`, and `boolean` types are supported. Defining what C++ type a Postgresql type should be mapped can be added to `convertDataType` in `code_gen.cpp`. 
-- Only supports stored procedures that returns rows of tables. Joins or other derived data is not yet supported. 

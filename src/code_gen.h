@@ -14,8 +14,8 @@ struct VariableData
 
 struct TableData
 {
-    std::string name; 
-    std::vector<VariableData> rows; 
+    std::string name;
+    std::vector<VariableData> rows;
 };
 
 std::string convertDataType(std::string &);
@@ -23,6 +23,9 @@ std::vector<VariableData> getVariablesAndTypes(std::string &);
 void dataCleanup(std::string &);
 
 void generateFunctions(pqxx::work &);
-void generateStructs(pqxx::work &);
+
+std::string generateStructs(std::string &, std::string &);
+void generateTableStructs(pqxx::work &);
+void generateFunctionStructs(pqxx::work &, std::string, std::string);
 
 #endif // CODE_GEN_H
