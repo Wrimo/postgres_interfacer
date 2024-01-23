@@ -17,7 +17,6 @@ int main(int argc, char *argv[])
         std::string command((std::istreambuf_iterator<char>(procedureScript)),
                            std::istreambuf_iterator<char>());
         txn.exec(command);
-        txn.commit();
     }
     else if (argc > 1)
     {
@@ -28,6 +27,7 @@ int main(int argc, char *argv[])
     generateTableStructs(txn);
     generateStoredProcedures(txn);
 
+    txn.commit();
 
     return 0;
 }
