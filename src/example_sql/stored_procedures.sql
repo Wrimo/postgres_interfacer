@@ -36,3 +36,8 @@ inner join book on
     book.author_id = author.id
 group by name, title;
 $$ LANGUAGE SQL;
+
+CREATE OR REPLACE PROCEDURE insert_author(firstName text, lastName text, age integer)
+LANGUAGE SQL AS $$
+INSERT INTO author(firstName, lastName, age) VALUES(firstName, lastName, age);
+$$

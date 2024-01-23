@@ -22,10 +22,14 @@ std::string convertDataType(std::string &);
 std::vector<VariableData> getVariablesAndTypes(std::string &);
 void dataCleanup(std::string &);
 
-void generateFunctions(pqxx::work &);
+void generateStoredProcedures(pqxx::work &);
+void generateFunction(pqxx::row &, std::ofstream &, std::ofstream &);
+void generateProcedure(pqxx::row &, std::ofstream &, std::ofstream &);
+std::string generatePassedParameters(std::vector<VariableData> &); 
+std::string generateFunctionCall(std::vector<VariableData> &);
 
 std::string generateStructs(std::string &, std::string &);
 void generateTableStructs(pqxx::work &);
-void generateFunctionStructs(pqxx::work &, std::string, std::string);
+void generateFunctionStructs(std::string, std::string);
 
 #endif // CODE_GEN_H

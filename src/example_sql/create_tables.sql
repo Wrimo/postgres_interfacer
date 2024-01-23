@@ -1,27 +1,27 @@
-CREATE TABLE book
-(
-    id integer, 
-    title text, 
-    author_id integer 
-);
-CREATE TABLE sale 
-(
-    id integer, 
-    sales numeric,
-    book_id integer
-);
 CREATE TABLE author
 (
-    id integer, 
+    id serial primary key, 
     firstName text, 
     lastName text, 
     age int
 );
+CREATE TABLE book
+(
+    id serial primary key, 
+    title text, 
+    author_id integer references author(id) 
+);
+CREATE TABLE sale 
+(
+    id serial primary key, 
+    sales numeric,
+    book_id integer references book(id)
+);
 
-INSERT INTO book VALUES 
-(0, 'Blood Meridian', 0), 
-(1, 'Mrs. Dalloway', 1);
+INSERT INTO author(firstName, lastName, age) VALUES 
+('Cormac', 'McCarthy', 90),
+('Virgina', 'Woolf', 141); 
 
-INSERT INTO author VALUES 
-(0, 'Cormac', 'McCarthy', 90),
-(1, 'Virgina', 'Woolf', 141); 
+INSERT INTO book(title, author_id) VALUES 
+('Blood Meridian', 1), 
+('Mrs. Dalloway', 2);

@@ -10,8 +10,8 @@ std::map<std::string, TableData> Tables;
 
 void dataCleanup(std::string &str)
 {
-    if (str.substr(0, 5) == "TABLE") 
-        str.erase(0, 5); 
+    if (str.substr(0, 5) == "TABLE")
+        str.erase(0, 5);
 
     for (unsigned int i = 0; i < str.length(); ++i)
         if (str[i] == ',')
@@ -81,7 +81,7 @@ std::string generateStructs(std::string &name, std::string &colums)
     return "\n" + strStruct.str();
 }
 
-void generateFunctionStructs(pqxx::work &txn, std::string name, std::string columns)
+void generateFunctionStructs(std::string name, std::string columns)
 {
     std::ofstream headerFile("types.h", std::ios_base::app);
     headerFile << generateStructs(name, columns);
@@ -104,9 +104,10 @@ void generateTableStructs(pqxx::work &txn)
     std::cout << "FINISHED TABLE STRUCTS\n";
 }
 
-void generateFunctions(pqxx::work &txn)
+void generateStoredProcedures(pqxx::work &txn)
 {
     std::cout << "GENERATING FUNCTIONS\n";
+
     pqxx::result r{txn.exec("SELECT * FROM private.get_stored_procedures();")};
     std::ofstream headerFile("procedures.h");
     std::ofstream cppFile("procedures.cpp");
@@ -117,87 +118,124 @@ void generateFunctions(pqxx::work &txn)
                << "#include \"types.h\"\n\n";
     cppFile << "#include \"procedures.h\"\n";
 
-    headerFile << "std::string quote(std::string &);\n\n";
+    headerFile << "std::string quote(std::string &);\n";
     cppFile << R"(std::string quote(std::string & str) { return "\'" + str + "\'";})"
             << "\n\n";
 
     for (auto row : r)
     {
-        std::istringstream returnType(row["output"].c_str());
-        std::string table;
-
-        returnType >> table;
-        if (table == "SETOF") // is returning rows from an existing table
-            returnType >> table;
-        else if (table.substr(0, 5) == "TABLE") // is returning a virtual table that needs to be created
-        {
-            table = row["name"].c_str();
-            generateFunctionStructs(txn, table, row["output"].c_str());
-        }
-        table = table + "Data";
-
-        headerFile << "\nstd::vector<" << table << "> " << row["name"].c_str() << "(pqxx::work &txn";
-        cppFile << "\nstd::vector<" << table << "> " << row["name"].c_str() << "(pqxx::work &txn";
-
-        std::string vars = row["input"].c_str();
-        std::vector<VariableData> params = getVariablesAndTypes(vars);
-
-        for (size_t i = 0; i < params.size(); ++i)
-        {
-            headerFile << ", " << params[i].type;
-            cppFile << ", " << params[i].type << " " << params[i].name;
-        }
-        headerFile << ");";
-        cppFile << ")\n";
-
-        std::ostringstream query;
-
-        query << "SELECT * FROM " << row["name"].c_str();
-        if (params.size() > 0)
-        {
-            query << "(\"";
-
-            for (size_t i = 0; i < params.size(); ++i)
-            {
-                if (params[i].type == "std::string")
-                    query << " + quote(" << params[i].name << ")";
-                else if (params[i].type == "int" || params[i].type == "float")
-                    query << " + std::to_string(" << params[i].name << ")";
-
-                query << (i == params.size() - 1 ? "" : R"(+ ", ")");
-            }
-
-            query << " + \");";
-        }
+        std::string output = row["output"].c_str();
+        if (output == "")
+            generateProcedure(row, cppFile, headerFile);
         else
-        {
-            query << "()";
-        }
-
-        cppFile << "{\n	pqxx::result r {txn.exec(\"" << query.str() << "\")};\n";
-
-        cppFile << "    std::vector<" << table << "> data;\n";
-        cppFile << "    for (auto row : r)\n    {\n"
-                << "        " << table << " x;\n";
-
-        // convert each value in row to value in struct
-        for (VariableData row : Tables[table].rows)
-        {
-            if (row.type == "int")
-                cppFile << "        x." << row.name << " = "
-                        << "std::stoi(row[\"" << row.name << "\"].c_str());\n";
-            else if (row.type == "float")
-                cppFile << "        x." << row.name << " = "
-                        << "std::stof(row[\"" << row.name << "\"].c_str());\n";
-            else
-                cppFile << "        x." << row.name << " = "
-                        << "row[\"" << row.name << "\"].c_str();\n";
-        }
-        cppFile << "        data.push_back(x);\n";
-        cppFile << "    }";
-
-        cppFile << "\n	return data;\n}";
+            generateFunction(row, cppFile, headerFile);
     }
-    cppFile.close();
     std::cout << "FINISHED GENERATING FUNCTIONS\n";
+}
+
+std::string generatePassedParameters(std::vector<VariableData> &params)
+{
+    std::ostringstream out;
+
+    for (size_t i = 0; i < params.size(); ++i)
+    {
+        out << ", " << params[i].type << " " << params[i].name;
+    }
+
+    return out.str();
+}
+
+std::string generateFunctionCall(std::vector<VariableData> &params)
+{
+    if (params.size() == 0) 
+        return "()";
+
+    std::ostringstream call;
+    call << "(\"";
+
+    for (size_t i = 0; i < params.size(); ++i)
+    {
+        if (params[i].type == "std::string")
+            call << " + quote(" << params[i].name << ")";
+        else if (params[i].type == "int" || params[i].type == "float")
+            call << " + std::to_string(" << params[i].name << ")";
+
+        call << (i == params.size() - 1 ? "" : R"(+ ", ")");
+    }
+
+    call << " + \")";
+    return call.str();
+}
+
+void generateFunction(pqxx::row &row, std::ofstream &cppFile, std::ofstream &headerFile) // generates code for stored procedures that return a value
+{
+
+    std::string functionName = row["name"].c_str();
+    std::string returnType = row["output"].c_str();
+
+    if (returnType.substr(0, 5) == "TABLE")
+    {
+        generateFunctionStructs(functionName, returnType);
+        returnType = functionName + "Data";
+    }
+    else
+    {
+        returnType = returnType.substr(6) + "Data";
+    }
+
+    headerFile << "\nstd::vector<" << returnType << "> ";
+    cppFile << "\nstd::vector<" << returnType << "> ";
+    headerFile << functionName << "(pqxx::work &txn";
+    cppFile << functionName << "(pqxx::work &txn";
+
+    std::string vars = row["input"].c_str();
+    std::vector<VariableData> params = getVariablesAndTypes(vars);
+
+    std::string paramsString = generatePassedParameters(params);
+    headerFile << paramsString << ");";
+    cppFile << paramsString << ")\n";
+
+    cppFile << "{\n    pqxx::result r {txn.exec(\"";
+    cppFile << "SELECT * FROM " << functionName  << generateFunctionCall(params) << ";";
+    cppFile << "\")};\n";
+
+    cppFile << "    std::vector<" << returnType << "> data;\n";
+    cppFile << "    for (auto row : r)\n    {\n"
+            << "        " << returnType << " x;\n";
+
+    for (VariableData row : Tables[returnType].rows) // convert each value in row to value in struct
+    {
+        if (row.type == "int")
+            cppFile << "        x." << row.name << " = "
+                    << "std::stoi(row[\"" << row.name << "\"].c_str());\n";
+        else if (row.type == "float")
+            cppFile << "        x." << row.name << " = "
+                    << "std::stof(row[\"" << row.name << "\"].c_str());\n";
+        else
+            cppFile << "        x." << row.name << " = "
+                    << "row[\"" << row.name << "\"].c_str();\n";
+    }
+    cppFile << "        data.push_back(x);\n";
+    cppFile << "    }";
+
+    cppFile << "\n	return data;\n}";
+}
+
+void generateProcedure(pqxx::row &row, std::ofstream &cppFile, std::ofstream &headerFile) // generates code for stored procedures that do not return a value
+{
+    std::string functionName = row["name"].c_str();
+    headerFile << "\nvoid " << functionName << "(pqxx::work &txn";
+    cppFile << "\nvoid " << functionName << "(pqxx::work &txn";
+
+    std::string vars = row["input"].c_str();
+    std::vector<VariableData> params = getVariablesAndTypes(vars);
+
+    std::string paramsString = generatePassedParameters(params);
+    headerFile << paramsString << ");";
+    cppFile << paramsString << ")\n";
+
+    cppFile << "{\n	pqxx::result r {txn.exec(\"";
+    cppFile << "CALL " << functionName << generateFunctionCall(params) << ";";
+    cppFile << "\")};\n";
+    cppFile << "}";
 }

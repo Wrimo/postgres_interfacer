@@ -11,7 +11,7 @@ Once libpqxx is installed and a Postgresql database is setup with tables and sto
 ```
 #define USERNAME "user" 
 #define PASSWORD "password"
-#define PORT "1111"
+#define PORT "xxxx"
 ```
 
 Then run the following commands in the src directory:

@@ -16,11 +16,13 @@ int main()
     pqxx::connection c{conString.str()};
     pqxx::work txn{c};
 
-    auto r = get_author_books(txn);
+    insert_author(txn, "Fyodor", "Dostoevsky", 100);
+    auto r = get_authors(txn);
     for (auto i : r) 
     {
-        std::cout << i.name << " wrote " << i.title << "\n";
+        std::cout << i.firstname << " " << i.lastname << "\n";
     }
+    txn.commit();
 
     return 0;
 }
