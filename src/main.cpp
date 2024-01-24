@@ -24,8 +24,10 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    generateTableStructs(txn);
-    generateStoredProcedures(txn);
+    CPPImplementation *cpp = new CPPImplementation();
+    codeGenStart(cpp, txn);
+
+    delete cpp; 
 
     txn.commit();
 

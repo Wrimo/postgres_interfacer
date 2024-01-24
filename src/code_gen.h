@@ -3,30 +3,17 @@
 
 #include <pqxx/pqxx>
 #include <string>
-#include <vector>
 #include <map>
+#include "code_gen_types.h"
 
-struct VariableData
-{
-    std::string name;
-    std::string type;
-};
+void codeGenStart(LanguageImplementation*, pqxx::work &);
 
-struct TableData
-{
-    std::string name;
-    std::vector<VariableData> rows;
-};
-
-std::string convertDataType(std::string &);
 std::vector<VariableData> getVariablesAndTypes(std::string &);
 void dataCleanup(std::string &);
 
 void generateStoredProcedures(pqxx::work &);
-void generateFunction(pqxx::row &, std::ofstream &, std::ofstream &);
-void generateProcedure(pqxx::row &, std::ofstream &, std::ofstream &);
-std::string generatePassedParameters(std::vector<VariableData> &); 
-std::string generateFunctionCall(std::vector<VariableData> &);
+std::string generateFunction(pqxx::row &);
+std::string generateProcedure(pqxx::row &);
 
 std::string generateStructs(std::string &, std::string &);
 void generateTableStructs(pqxx::work &);
