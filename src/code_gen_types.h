@@ -33,7 +33,6 @@ public:
 
 class CPPImplementation : public LanguageImplementation
 {
-public:
     std::string fileExtension() override
     {
         return ".h";
@@ -41,7 +40,6 @@ public:
 
     std::string typeRequirements() override
     {
-        std::cout << "new one called\n";
         return "#include <string>\n";
     }
 
@@ -63,7 +61,7 @@ public:
         out << "#include <pqxx/pqxx>\n"
             << "#include <string>\n"
             << "#include <vector>\n"
-            << "#include \"types.h\"\n\n"
+            << "#include \"generated_types.h\"\n\n"
             << R"(std::string quote(std::string & str) { return "\'" + str + "\'";})"
             << "\n\n";
         return out.str();
@@ -167,5 +165,107 @@ public:
 
         return out.str();
     }
+};
+
+class PythonImplementation : public LanguageImplementation
+{
+    std::string fileExtension() override
+    {
+        return ".py";
+    }
+
+    std::string typeRequirements() override
+    {
+        return "from dataclasses import dataclass";
+    }
+
+    std::string typeGen(std::string &name, std::vector<VariableData> vars) override
+    {
+        std::ostringstream strStruct;
+        strStruct << "@dataclass\n";
+        strStruct << "class " << name << ":\n";
+        for (size_t i = 0; i < vars.size(); ++i)
+        {
+            strStruct << "    " << vars[i].name << " = None\n";
+        }
+        return "\n" + strStruct.str();
+    }
+
+    std::string procedureRequirements() override
+    {
+
+        return "import psycopg2\nfrom generated_types import *\n";
+    }
+
+    std::string convertType(std::string &postgresType) override
+    {
+        return ""; 
+    }
+
+    std::string formatParameters(std::vector<VariableData> &params) override
+    {
+        std::ostringstream out;
+
+        for (size_t i = 0; i < params.size(); ++i)
+        {
+            out << ", " << params[i].name;
+        }
+
+        return out.str();
+    }
+
+    std::string generateFunctionCall(std::string name, std::vector<VariableData> &params) override
+    {
+
+        if (params.size() == 0)
+            return "\"" + name + "()\"";
+
+        std::ostringstream call;
+        call << "f\"" << name << "(";
+
+        for (size_t i = 0; i < params.size(); ++i)
+        {
+            call << "{" << params[i].name << "}"; 
+            call << (i == params.size() - 1 ? "" : ", ");
+        }
+        call << ")\"";
+        return call.str();
+    }
+
+     std::string createProcedure(std::string name, std::string sql, std::vector<VariableData> &params) override
+    {
+        std::ostringstream out;
+        
+        std::string paramsString = this->formatParameters(params);
+        out << "\ndef " << name << "(cur";
+        out << paramsString << "):\n";
+        out << "    cur.execute(" << sql << ")\n";
+
+        return out.str();
+    }
+    
+    std::string createFunction(std::string name, std::string sql, std::vector<VariableData> &params, TableData table) override
+    {
+        std::ostringstream out;
+        std::string paramsString = this->formatParameters(params);
+
+        out << "\ndef " << name << "(cur";
+        out << paramsString << "):\n";
+
+        out << "    cur.execute(" << sql << ")\n";
+
+        out << "    data = []\n";
+        out << "    colnames = [desc[0] for desc in cur.description]\n";
+        out << "    for item in cur.fetchall():\n";
+        out << "        x = " << table.name << "()\n";
+        out << "        for idx, name in enumerate(colnames):\n";
+        out << "            setattr(x, name, item[idx])\n";
+        out << "        data.append(x)\n";
+
+        out << "\n    return data\n";
+
+        return out.str();
+    }
+
 };
 #endif

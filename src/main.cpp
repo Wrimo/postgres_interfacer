@@ -24,10 +24,10 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    CPPImplementation *cpp = new CPPImplementation();
-    codeGenStart(cpp, txn);
+    // CPPImplementation *cpp = new CPPImplementation();
+    PythonImplementation *py = new PythonImplementation();
+    codeGenStart(py, txn);
 
-    delete cpp; 
 
     txn.commit();
 
