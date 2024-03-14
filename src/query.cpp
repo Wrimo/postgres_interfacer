@@ -17,10 +17,10 @@ int main()
     pqxx::work txn{c};
 
     insert_author(txn, "Fyodor", "Dostoevsky", 100);
-    auto r = get_authors(txn);
+    auto r = get_authors(txn); 
     for (auto i : r) 
     {
-        std::cout << i.firstname << " " << i.lastname << "\n";
+        std::cout << i.firstname << " wrote  " << i.lastname << "\n";
     }
     txn.commit();
 

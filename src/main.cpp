@@ -24,9 +24,10 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // CPPImplementation *cpp = new CPPImplementation();
+    CPPImplementation *cpp = new CPPImplementation();
     PythonImplementation *py = new PythonImplementation();
-    codeGenStart(py, txn);
+    RustImplementation * rs = new RustImplementation(); 
+    codeGenStart(rs, txn);
 
 
     txn.commit();
