@@ -26,9 +26,9 @@ public:
     virtual std::string procedureRequirements() = 0;
     virtual std::string convertType(std::string &postgresType) = 0;
     virtual std::string formatParameters(std::vector<VariableData> &params) = 0;
-    virtual std::string generateFunctionCall(std::string name, std::vector<VariableData> &params) = 0;
-    virtual std::string createProcedure(std::string name, std::string sql, std::vector<VariableData> &params) = 0;
-    virtual std::string createFunction(std::string name, std::string sql, std::vector<VariableData> &params, TableData table) = 0;
+    virtual std::string generateFunctionCall(std::string name, std::string sqlPreamble, std::vector<VariableData> &params) = 0;
+    virtual std::string createProcedure(std::string name, std::vector<VariableData> &params) = 0;
+    virtual std::string createFunction(std::string name, std::vector<VariableData> &params, TableData table) = 0;
 };
 
 class CPPImplementation : public LanguageImplementation
@@ -93,14 +93,14 @@ class CPPImplementation : public LanguageImplementation
         return out.str();
     }
 
-    std::string generateFunctionCall(std::string name, std::vector<VariableData> &params) override
+    std::string generateFunctionCall(std::string name, std::string sqlPreamble, std::vector<VariableData> &params) override
     {
 
         if (params.size() == 0)
-            return name + "()";
+            return sqlPreamble + " " + name + "();";
 
         std::ostringstream call;
-        call << name << "(\"";
+        call << sqlPreamble << " " << name << "(\"";
 
         for (size_t i = 0; i < params.size(); ++i)
         {
@@ -112,14 +112,16 @@ class CPPImplementation : public LanguageImplementation
             call << (i == params.size() - 1 ? "" : R"(+ ", ")");
         }
 
-        call << " + \")";
+        call << " + \");";
         return call.str();
     }
 
-    std::string createProcedure(std::string name, std::string sql, std::vector<VariableData> &params) override
+    std::string createProcedure(std::string name, std::vector<VariableData> &params) override
     {
         std::ostringstream out;
+        std::string sql = this->generateFunctionCall(name, "CALL", params);
         std::string paramsString = this->formatParameters(params);
+
         out << "\nvoid " << name << "(pqxx::work &txn";
         out << paramsString << ")\n";
         out << "{\n	pqxx::result r {txn.exec(\"";
@@ -129,9 +131,10 @@ class CPPImplementation : public LanguageImplementation
         return out.str();
     }
 
-    std::string createFunction(std::string name, std::string sql, std::vector<VariableData> &params, TableData table) override
+    std::string createFunction(std::string name, std::vector<VariableData> &params, TableData table) override
     {
         std::ostringstream out;
+        std::string sql = this->generateFunctionCall(name, "SELECT * FROM", params);
         std::string paramsString = this->formatParameters(params);
 
         out << "\nstd::vector<" << table.name << "> ";
@@ -199,7 +202,7 @@ class PythonImplementation : public LanguageImplementation
 
     std::string convertType(std::string &postgresType) override
     {
-        return ""; 
+        return "";
     }
 
     std::string formatParameters(std::vector<VariableData> &params) override
@@ -214,28 +217,30 @@ class PythonImplementation : public LanguageImplementation
         return out.str();
     }
 
-    std::string generateFunctionCall(std::string name, std::vector<VariableData> &params) override
+    std::string generateFunctionCall(std::string name, std::string sqlPreamble, std::vector<VariableData> &params) override
     {
 
         if (params.size() == 0)
-            return "\"" + name + "()\"";
+            return "\"" + sqlPreamble + " " + name + "();\"";
 
         std::ostringstream call;
-        call << "f\"" << name << "(";
+        call << "f\"" << sqlPreamble << " " << name << "(";
 
         for (size_t i = 0; i < params.size(); ++i)
         {
-            call << "{" << params[i].name << "}"; 
+            call << "{" << params[i].name << "}";
             call << (i == params.size() - 1 ? "" : ", ");
         }
-        call << ")\"";
+        call << ");\"";
         return call.str();
     }
 
-     std::string createProcedure(std::string name, std::string sql, std::vector<VariableData> &params) override
+    std::string createProcedure(std::string name, std::vector<VariableData> &params) override
     {
         std::ostringstream out;
-        
+
+        std::string sql = this->generateFunctionCall(name, "CALL", params);
+
         std::string paramsString = this->formatParameters(params);
         out << "\ndef " << name << "(cur";
         out << paramsString << "):\n";
@@ -243,11 +248,13 @@ class PythonImplementation : public LanguageImplementation
 
         return out.str();
     }
-    
-    std::string createFunction(std::string name, std::string sql, std::vector<VariableData> &params, TableData table) override
+
+    std::string createFunction(std::string name, std::vector<VariableData> &params, TableData table) override
     {
         std::ostringstream out;
         std::string paramsString = this->formatParameters(params);
+
+        std::string sql = this->generateFunctionCall(name, "SELECT * FROM", params);
 
         out << "\ndef " << name << "(cur";
         out << paramsString << "):\n";
@@ -266,6 +273,129 @@ class PythonImplementation : public LanguageImplementation
 
         return out.str();
     }
+};
 
+class RustImplementation : public LanguageImplementation
+{
+    std::string fileExtension() override
+    {
+        return ".rs";
+    }
+
+    std::string typeRequirements() override
+    {
+        return "";
+    }
+
+    std::string typeGen(std::string &name, std::vector<VariableData> vars) override
+    {
+        std::ostringstream strStruct;
+        strStruct << "pub struct " << name << " {\n";
+        for (size_t i = 0; i < vars.size(); ++i)
+        {
+            strStruct << "  pub " << vars[i].name << ": " << vars[i].type << ",\n";
+        }
+        strStruct << "\n}";
+        return "\n" + strStruct.str();
+    }
+
+    std::string procedureRequirements() override
+    {
+        return "use sqlx::Row;\nuse sqlx::postgres::{PgRow};\nuse super::generated_types::*;\n\n";
+    }
+
+    std::string convertType(std::string &postgresType) override
+    {
+        if (postgresType == "text")
+            return "String";    
+        else if (postgresType == "integer")
+            return "i32";
+        else if (postgresType == "numeric")
+            return "f64";
+        else if (postgresType == "boolean")
+            return "bool";
+        std::cout << postgresType << " is not a valid type\n";
+        return "BAD_TYPE";
+    }
+    std::string formatParameters(std::vector<VariableData> &params) override
+    {
+        std::ostringstream out;
+
+        for (size_t i = 0; i < params.size(); ++i)
+        {
+            out << ", " << params[i].name << ": " << params[i].type;
+        }
+
+        return out.str();
+    }
+
+    std::string generateFunctionCall(std::string name, std::string sqlPreamble, std::vector<VariableData> &params) override
+    {
+        if (params.size() == 0)
+            return "\"" + sqlPreamble + " " + name + "();\"";
+
+        std::ostringstream call;
+        call << "format!(\"" << sqlPreamble << " " << name << "(";
+            for (size_t i = 0; i < params.size(); ++i)
+        {
+            call << "{}";
+            call << (i == params.size() - 1 ? ");\", " : ", ");
+        }
+
+        for (size_t i = 0; i < params.size(); ++i)
+        {
+            call << params[i].name;
+            call << (i == params.size() - 1 ? "" : ", ");
+        }
+
+        call << ").as_str()";
+        return call.str();
+    }
+
+    std::string createProcedure(std::string name, std::vector<VariableData> &params)
+    {
+        std::ostringstream out;
+        std::string paramsString = this->formatParameters(params);
+        std::string sql = this->generateFunctionCall(name, "CALL", params);
+
+        out << "\npub async fn " << name << "(pool: &sqlx::Pool<sqlx::Postgres>";
+        out << paramsString << ") -> Result<(), sqlx::Error>\n";
+
+        out << "{\n    sqlx::raw_sql(";
+        out << sql;
+        out << ").execute(pool).await?;\n";
+        out << "    Ok(())\n";
+        out <<"}\n";
+
+        return out.str();
+    }
+
+    std::string createFunction(std::string name, std::vector<VariableData> &params, TableData table) override
+    {
+        std::ostringstream out;
+        std::string paramsString = this->formatParameters(params);
+        std::string sql = this->generateFunctionCall(name,  "SELECT * FROM", params);
+
+        out << "\npub async fn " << name << "(pool: &sqlx::Pool<sqlx::Postgres>";
+        out << paramsString << ") -> Result<Vec<" << table.name << ">, sqlx::Error> {\n";
+
+        out << "    let response: Vec<PgRow> = sqlx::query(" << sql << ").fetch_all(pool).await?;\n";
+        out << "    let mut result: Vec<" << table.name << "> = Vec::new();\n";
+        out << "    for i in 0..response.len() {\n";
+        out << "        let x = " << table.name << " {\n";
+
+        for (size_t i = 0; i < table.rows.size(); ++i)
+        {
+            out << "            " << table.rows[i].name << ": "
+                << "response[i].try_get(" << i << ")?,\n";
+        }
+        out << "    };";
+        out << "\n    result.push(x);\n";
+        out << "    }";
+
+        out << "\n	Ok(result)  \n}\n";
+
+        return out.str();
+    }
 };
 #endif

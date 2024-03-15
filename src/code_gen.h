@@ -6,7 +6,7 @@
 #include <map>
 #include "code_gen_types.h"
 
-void codeGenStart(LanguageImplementation*, pqxx::work &);
+void codeGenStart(LanguageImplementation*, pqxx::work &, std::string);
 
 std::vector<VariableData> getVariablesAndTypes(std::string &);
 void dataCleanup(std::string &);

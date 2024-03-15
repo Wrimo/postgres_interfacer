@@ -8,9 +8,11 @@
 
 std::map<std::string, TableData> Tables;
 LanguageImplementation *langDef;
+std::string filePath; 
 
-void codeGenStart(LanguageImplementation *lang, pqxx::work &txn)
+void codeGenStart(LanguageImplementation *lang, pqxx::work &txn, std::string path)
 {
+    filePath = path; 
     langDef = lang;
     generateTableStructs(txn);
     generateStoredProcedures(txn);
@@ -70,7 +72,7 @@ std::string generateStructs(std::string &name, std::string &colums)
 
 void generateFunctionStructs(std::string name, std::string columns)
 {
-    std::ofstream typeFile("generated_types" + langDef->fileExtension(), std::ios_base::app);
+    std::ofstream typeFile(filePath + "/generated_types" + langDef->fileExtension(), std::ios_base::app);
     typeFile << generateStructs(name, columns);
     typeFile.close();
 }
@@ -80,7 +82,7 @@ void generateTableStructs(pqxx::work &txn)
     std::cout << "GENERATING TABLE STRUCTS\n";
 
     pqxx::result r{txn.exec("SELECT * FROM private.get_tables_and_fields();")};
-    std::ofstream typeFile("generated_types" + langDef->fileExtension());
+    std::ofstream typeFile(filePath + "/generated_types" + langDef->fileExtension());
     typeFile << langDef->typeRequirements();
 
     for (auto row : r)
@@ -99,7 +101,7 @@ void generateStoredProcedures(pqxx::work &txn)
     std::cout << "GENERATING FUNCTIONS\n";
 
     pqxx::result r{txn.exec("SELECT * FROM private.get_stored_procedures();")};
-    std::ofstream procedureFile("generated_procedures" + langDef->fileExtension());
+    std::ofstream procedureFile(filePath + "/generated_procedures" + langDef->fileExtension());
 
     procedureFile << langDef->procedureRequirements();    
 
@@ -134,10 +136,9 @@ std::string generateFunction(pqxx::row &row) // generates code for stored proced
     std::string vars = row["input"].c_str();
     std::vector<VariableData> params = getVariablesAndTypes(vars);
 
-    std::ostringstream sql;
-    sql << "\"SELECT * FROM \" + " << langDef->generateFunctionCall(functionName, params) << " + \";\"";
+    
 
-    out << langDef->createFunction(functionName, sql.str(), params, Tables[returnType]);
+    out << langDef->createFunction(functionName, params, Tables[returnType]);
 
     return out.str(); 
 }
@@ -150,10 +151,7 @@ std::string generateProcedure(pqxx::row &row) // generates code for stored proce
     std::string vars = row["input"].c_str();
     std::vector<VariableData> params = getVariablesAndTypes(vars);
 
-    std::ostringstream sql; 
-    sql << "\"CALL \" + " << langDef->generateFunctionCall(functionName, params) << " + \";\"";
-
-    out << langDef->createProcedure(functionName, sql.str(), params);
+    out << langDef->createProcedure(functionName, params);
 
     return out.str(); 
 }
