@@ -5,7 +5,7 @@ Will not work until code has been generated for the provided example SQL.
 
 #include <iostream>
 #include <vector>
-#include "procedures.h"
+#include "generated_procedures.h"
 #include "hidden.h"
 
 
@@ -20,7 +20,7 @@ int main()
     auto r = get_authors(txn); 
     for (auto i : r) 
     {
-        std::cout << i.firstname << " wrote  " << i.lastname << "\n";
+        std::cout << i.firstname << " wrote " << i.lastname << "\n";
     }
     txn.commit();
 

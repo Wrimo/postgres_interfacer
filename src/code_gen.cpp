@@ -134,10 +134,9 @@ std::string generateFunction(pqxx::row &row) // generates code for stored proced
     std::string vars = row["input"].c_str();
     std::vector<VariableData> params = getVariablesAndTypes(vars);
 
-    std::ostringstream sql;
-    sql << "\"SELECT * FROM \" + " << langDef->generateFunctionCall(functionName, params) << " + \";\"";
+    
 
-    out << langDef->createFunction(functionName, sql.str(), params, Tables[returnType]);
+    out << langDef->createFunction(functionName, params, Tables[returnType]);
 
     return out.str(); 
 }
@@ -150,10 +149,7 @@ std::string generateProcedure(pqxx::row &row) // generates code for stored proce
     std::string vars = row["input"].c_str();
     std::vector<VariableData> params = getVariablesAndTypes(vars);
 
-    std::ostringstream sql; 
-    sql << "\"CALL \" + " << langDef->generateFunctionCall(functionName, params) << " + \";\"";
-
-    out << langDef->createProcedure(functionName, sql.str(), params);
+    out << langDef->createProcedure(functionName, params);
 
     return out.str(); 
 }
