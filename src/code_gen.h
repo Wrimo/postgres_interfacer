@@ -8,14 +8,14 @@
 
 void codeGenStart(LanguageImplementation*, pqxx::work &, std::string);
 
-std::vector<VariableData> getVariablesAndTypes(std::string &);
+std::vector<VariableData> getVariablesAndTypes(std::string &, bool);
 void dataCleanup(std::string &);
 
 void generateStoredProcedures(pqxx::work &);
 std::string generateFunction(pqxx::row &);
 std::string generateProcedure(pqxx::row &);
 
-std::string generateStructs(std::string &, std::string &);
+std::string generateStructs(std::string &, std::string &, bool);
 void generateTableStructs(pqxx::work &);
 void generateFunctionStructs(std::string, std::string);
 

@@ -9,12 +9,13 @@ struct VariableData
 {
     std::string name;
     std::string type;
+    bool nullable;
 };
 
 struct TableData
 {
     std::string name;
-    std::vector<VariableData> rows;
+    std::vector<VariableData> columns;
 };
 
 class LanguageImplementation
@@ -149,7 +150,7 @@ class CPPImplementation : public LanguageImplementation
         out << "    for (auto row : r)\n    {\n"
             << "        " << table.name << " x;\n";
 
-        for (VariableData row : table.rows) // convert each value in row to value in struct
+        for (VariableData row : table.columns) // convert each value in row to value in struct
         {
             if (row.type == "int")
                 out << "        x." << row.name << " = "
@@ -284,18 +285,22 @@ class RustImplementation : public LanguageImplementation
 
     std::string typeRequirements() override
     {
-        return "";
+        return "use rocket::serde::Serialize;\n";
     }
 
     std::string typeGen(std::string &name, std::vector<VariableData> vars) override
     {
         std::ostringstream strStruct;
+        strStruct << "#[derive(Serialize)]\n #[serde(crate = \"rocket::serde\")]\n";
         strStruct << "pub struct " << name << " {\n";
         for (size_t i = 0; i < vars.size(); ++i)
         {
-            strStruct << "  pub " << vars[i].name << ": " << vars[i].type << ",\n";
+            if (vars[i].nullable)
+                strStruct << "  pub " << vars[i].name << ": Option<" << vars[i].type << ">,\n";
+            else
+                strStruct << "  pub " << vars[i].name << ": " << vars[i].type << ",\n";
         }
-        strStruct << "\n}";
+        strStruct << "}\n";
         return "\n" + strStruct.str();
     }
 
@@ -307,7 +312,7 @@ class RustImplementation : public LanguageImplementation
     std::string convertType(std::string &postgresType) override
     {
         if (postgresType == "text")
-            return "String";    
+            return "String";
         else if (postgresType == "integer")
             return "i32";
         else if (postgresType == "numeric")
@@ -336,7 +341,7 @@ class RustImplementation : public LanguageImplementation
 
         std::ostringstream call;
         call << "format!(\"" << sqlPreamble << " " << name << "(";
-            for (size_t i = 0; i < params.size(); ++i)
+        for (size_t i = 0; i < params.size(); ++i)
         {
             call << "{}";
             call << (i == params.size() - 1 ? ");\", " : ", ");
@@ -365,7 +370,7 @@ class RustImplementation : public LanguageImplementation
         out << sql;
         out << ").execute(pool).await?;\n";
         out << "    Ok(())\n";
-        out <<"}\n";
+        out << "}\n";
 
         return out.str();
     }
@@ -374,7 +379,7 @@ class RustImplementation : public LanguageImplementation
     {
         std::ostringstream out;
         std::string paramsString = this->formatParameters(params);
-        std::string sql = this->generateFunctionCall(name,  "SELECT * FROM", params);
+        std::string sql = this->generateFunctionCall(name, "SELECT * FROM", params);
 
         out << "\npub async fn " << name << "(pool: &sqlx::Pool<sqlx::Postgres>";
         out << paramsString << ") -> Result<Vec<" << table.name << ">, sqlx::Error> {\n";
@@ -384,10 +389,18 @@ class RustImplementation : public LanguageImplementation
         out << "    for i in 0..response.len() {\n";
         out << "        let x = " << table.name << " {\n";
 
-        for (size_t i = 0; i < table.rows.size(); ++i)
+        for (size_t i = 0; i < table.columns.size(); ++i)
         {
-            out << "            " << table.rows[i].name << ": "
+            if (table.columns[i].nullable)
+            {
+                out << "            " << table.columns[i].name << ": "
+                << "response[i].try_get(" << i << ").ok(),\n";
+            }
+            else 
+            {
+                out << "            " << table.columns[i].name << ": "
                 << "response[i].try_get(" << i << ")?,\n";
+            }
         }
         out << "    };";
         out << "\n    result.push(x);\n";

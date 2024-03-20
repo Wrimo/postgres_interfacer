@@ -32,7 +32,7 @@ void dataCleanup(std::string &str)
         str.erase(remove(str.begin(), str.end(), badChars[i]), str.end());
 }
 
-std::vector<VariableData> getVariablesAndTypes(std::string &str)
+std::vector<VariableData> getVariablesAndTypes(std::string &str, bool assumeNullable)
 {
     dataCleanup(str);
     if (str.length() == 0)
@@ -41,29 +41,35 @@ std::vector<VariableData> getVariablesAndTypes(std::string &str)
     std::istringstream ss(str);
     std::string name;
     std::string type;
+    std::string nullable;
     std::vector<VariableData> variables;
 
     while (!ss.eof())
     {
         ss >> name;
         ss >> type;
+        
+        if (!assumeNullable)
+            ss >> nullable; 
+
         VariableData s;
         s.name = name;
         s.type = langDef->convertType(type);
+        s.nullable = assumeNullable || nullable == "YES";
         variables.push_back(s);
     }
     return variables;
 }
 
-std::string generateStructs(std::string &name, std::string &colums)
+std::string generateStructs(std::string &name, std::string &colums, bool assumeNullable)
 {
     std::ostringstream strStruct;
 
     TableData table;
     table.name = name + "Data";
 
-    std::vector<VariableData> vars = getVariablesAndTypes(colums);
-    table.rows = vars;
+    std::vector<VariableData> vars = getVariablesAndTypes(colums, assumeNullable);
+    table.columns = vars;
     Tables[table.name] = table;
 
     std::string result = langDef->typeGen(table.name, vars);
@@ -73,7 +79,7 @@ std::string generateStructs(std::string &name, std::string &colums)
 void generateFunctionStructs(std::string name, std::string columns)
 {
     std::ofstream typeFile(filePath + "/generated_types" + langDef->fileExtension(), std::ios_base::app);
-    typeFile << generateStructs(name, columns);
+    typeFile << generateStructs(name, columns, true);
     typeFile.close();
 }
 
@@ -89,7 +95,7 @@ void generateTableStructs(pqxx::work &txn)
     {
         std::string name = row["name"].c_str();
         std::string columns = row["fields"].c_str();
-        typeFile << generateStructs(name, columns);
+        typeFile << generateStructs(name, columns, false);
     }
 
     typeFile.close();
@@ -134,9 +140,7 @@ std::string generateFunction(pqxx::row &row) // generates code for stored proced
     }
 
     std::string vars = row["input"].c_str();
-    std::vector<VariableData> params = getVariablesAndTypes(vars);
-
-    
+    std::vector<VariableData> params = getVariablesAndTypes(vars, false);
 
     out << langDef->createFunction(functionName, params, Tables[returnType]);
 
@@ -149,7 +153,7 @@ std::string generateProcedure(pqxx::row &row) // generates code for stored proce
     std::string functionName = row["name"].c_str();
 
     std::string vars = row["input"].c_str();
-    std::vector<VariableData> params = getVariablesAndTypes(vars);
+    std::vector<VariableData> params = getVariablesAndTypes(vars, false);
 
     out << langDef->createProcedure(functionName, params);
 

@@ -8,8 +8,8 @@ RETURNS TABLE(name text, fields text[])
 AS $$
 select
     t.table_name::text,
-    array_agg(c.column_name::text || ' ' || c.data_type order by c.ordinal_position) as columns
-from
+    array_agg(c.column_name::text || ' ' || c.data_type || ' ' || c.is_nullable::text order by c.ordinal_position) as columns
+    from
     information_schema.tables t
 inner join information_schema.columns c on
     t.table_name = c.table_name
